@@ -1,3 +1,11 @@
+import torch
+from torch import Tensor
+import torch.nn as nn
+import torch.nn.functional as F
+from typing import Optional, Sequence
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 class FocalLoss(nn.Module):
     """ Focal Loss, as described in https://arxiv.org/abs/1708.02002.
 

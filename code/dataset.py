@@ -1,3 +1,13 @@
+import torch
+import torchvision
+from torch.utils.data import Dataset
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
+import os
+import numpy as np
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(device)
 

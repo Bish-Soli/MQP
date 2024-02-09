@@ -1,3 +1,12 @@
+import torch
+import numpy as np
+import torch.optim as optim
+import numpy as np
+import math
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+
 class MixupLTDataloader():
     def __init__(self, batch_size, dataset, alpha=0.2):
         self.n_samples = len(dataset)
@@ -47,7 +56,7 @@ class MixupLTDataloader():
         c1 = math.floor(y_hat)
         decimal = y_hat - c1
         if c1 != self.n_classes -1:
-        c2 = c1 + 1
+            c2 = c1 + 1
         probability[c1] = 1 - decimal
         probability[c2] = decimal
         return x_hat , torch.FloatTensor(probability)
@@ -56,9 +65,9 @@ class MixupLTDataloader():
         data = []
         labels = []
         while len(data) < self.batch_size:
-        x, y = self.generate_mixup()
-        data.append(x)
-        labels.append(y)
+            x, y = self.generate_mixup()
+            data.append(x)
+            labels.append(y)
 
         return torch.stack(data), torch.stack(labels)
 
@@ -159,4 +168,37 @@ def calculate_mean_std(ds_train):
     (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
     Maybe you don't pass anything for the transform initially and then you update it
     """
-    raise NotImplemented('You must do.')
+    sum_rgb = np.array([0.0, 0.0, 0.0])
+    sum_squared_rgb = np.array([0.0, 0.0, 0.0])
+    total_pixels = 0
+    
+    for data, _ in ds_train:
+        # Assuming data is a PIL Image, convert it to a numpy array
+        numpy_data = np.array(data) / 255.0  # Scale pixel values to [0, 1]
+        # Sum up pixel values and squared pixel values
+        sum_rgb += numpy_data.sum(axis=(0, 1))
+        sum_squared_rgb += (numpy_data ** 2).sum(axis=(0, 1))
+        total_pixels += numpy_data.shape[0] * numpy_data.shape[1]
+    
+    # Calculate mean and std
+    mean_rgb = sum_rgb / total_pixels
+    std_rgb = np.sqrt((sum_squared_rgb / total_pixels) - (mean_rgb ** 2))
+    
+    #sum_rgb = np.array([0.0, 0.0, 0.0])
+    #sum_squared_rgb = np.array([0.0, 0.0, 0.0])
+    #total_pixels = 0
+    
+    #for data, _ in ds_train:
+        #numpy_data = np.array(data) / 255.0  # Assumes data is a PIL Image
+       # sum_rgb += numpy_data.sum(axis=(0, 1))
+        #sum_squared_rgb += (numpy_data ** 2).sum(axis=(0, 1))
+        #total_pixels += numpy_data.shape[0] * numpy_data.shape[1]
+    
+    #mean_rgb = sum_rgb / total_pixels
+    #std_rgb = np.sqrt((sum_squared_rgb / total_pixels) - (mean_rgb ** 2))
+    
+    # Ensure the return format is explicitly a tuple of tuples
+    #return tuple(mean_rgb), tuple(std_rgb)
+    
+    return mean_rgb, std_rgb
+    

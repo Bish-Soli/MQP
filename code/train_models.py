@@ -1,3 +1,14 @@
+
+import torch
+import torch.nn as nn
+from util import warmup_learning_rate, accuracy, AverageMeter
+import math
+import time
+import sys 
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+
 def train_contrastive(train_loader, model, criterion, optimizer, epoch, opt, ALPHA=0.8, BETA=0.2):
     """one epoch training"""
     model.train()
@@ -60,7 +71,7 @@ def train_contrastive(train_loader, model, criterion, optimizer, epoch, opt, ALP
 
     return losses.avg
 
-def validate_contrastive(test_loader, model, criterion, opt, ALPHA=0.8, BETA=0.2):
+def validate_contrastive(test_loader, model, criterion, opt, epoch, ALPHA=0.8, BETA=0.2):
     """one epoch training"""
     model.eval()
     CE = nn.CrossEntropyLoss()
@@ -77,9 +88,6 @@ def validate_contrastive(test_loader, model, criterion, opt, ALPHA=0.8, BETA=0.2
                 images = images.cuda(non_blocking=True)
                 labels = labels.cuda(non_blocking=True)
             bsz = labels.shape[0]
-
-            # warm-up learning rate
-            warmup_learning_rate(opt, epoch, idx, len(test_loader), optimizer)
 
             # compute loss
             features, x = model(images)
@@ -125,11 +133,10 @@ def train(train_loader, model, criterion, optimizer, epoch, opt):
     top1 = AverageMeter()
 
     end = time.time()
-    iterations = math.ceil(mixup.n_samples / mixup.batch_size)
     for idx, (images, labels) in enumerate(train_loader):
         data_time.update(time.time() - end)
         images = images.to(device)
-        lables = labels.to(device)
+        labels = labels.to(device)
 
         # images = images.cuda(non_blocking=True)
         # labels = labels.cuda(non_blocking=True)
@@ -168,8 +175,6 @@ def train(train_loader, model, criterion, optimizer, epoch, opt):
                    epoch, idx + 1, len(train_loader), batch_time=batch_time,
                    data_time=data_time, loss=losses, top1=top1))
             sys.stdout.flush()
-
-
 
     return losses.avg, top1.avg
 

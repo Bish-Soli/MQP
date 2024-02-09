@@ -1,3 +1,19 @@
+import torch
+import torch.backends.cudnn as cudnn
+from torchvision import transforms
+from torch.utils.data import DataLoader
+from tensorboard_logger import tb_logger
+import os
+import math
+import argparse
+import time 
+from train_models import validate, validate_contrastive, train, train_contrastive
+from models import SupCEResNet
+from models import SupConLoss
+from dataset import ImbalanceCIFAR, ImbalanceCIFAR10, ImbalanceCIFAR100
+from util import MixupLTDataloader, save_model, adjust_learning_rate, set_optimizer
+from focal import focal_loss
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def parse_option():
@@ -116,9 +132,6 @@ def parse_option():
 def set_model(opt):
     
     model = SupCEResNet(name=opt.model, num_classes=opt.n_cls)
-    # enable synchronized Batch Normalization
-    if opt.syncBN:
-        model = apex.parallel.convert_syncbn_model(model)
 
     if torch.cuda.is_available():
         if torch.cuda.device_count() > 1:
@@ -130,7 +143,7 @@ def set_model(opt):
 
 def main():
     best_acc = 0
-    opt = parse_option()
+    args = parse_option()
 
     # Define the dataset 
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
@@ -161,12 +174,15 @@ def main():
         criterion = torch.nn.CrossEntropyLoss() 
     elif args.loss == 'SupCon': 
         # Define the contrastive loss 
-        criterion = SupConLoss(temperature=opt.temp)
+        criterion = SupConLoss(temperature=args.temp)
     elif args.loss == 'Focal':
+        # TODO
+        print('Not implemented yet')
+        raise NotImplementedError('Gotta do this one.')
         # Define the focal loss 
         # Define the weight tensor
-        weights_tensor = focal_weights(ds_train)
-        criterion = focal_loss(alpha=weights_tensor, gamma=2.0, reduction='mean')
+        # weights_tensor = focal_weights(ds_train)
+        # criterion = focal_loss(alpha=weights_tensor, gamma=2.0, reduction='mean')
     else: 
         raise ValueError('Loss not configured.')
     
@@ -175,32 +191,32 @@ def main():
         # TODO: Import mixup from util.py
         train_loader = MixupLTDataloader(dataset=ds_train, batch_size= args.batch_size)
     else:    
-        train_loader = DataLoader(ds_train, batch_size=args.batch_size, shuffle=True, num_workers=opt.num_workers)
+        train_loader = DataLoader(ds_train, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
     
     # Create validation DataLoaders
-    test_loader = DataLoader(ds_test, batch_size=args.batch_size, shuffle=False, num_workers=opt.num_workers)
+    test_loader = DataLoader(ds_test, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
     
     
     # build model and criterion
-    model, criterion = set_model(opt, False, weights_tensor)
+    model, criterion = set_model(args) # TODO something not updated for focal , use_ce
 
     # build optimizer
-    optimizer = set_optimizer(opt, model)
+    optimizer = set_optimizer(args, model)
 
     # tensorboard
-    logger = tb_logger.Logger(logdir=opt.tb_folder, flush_secs=2)
+    logger = tb_logger.Logger(logdir=args.tb_folder, flush_secs=2)
 
     # training routine
-    for epoch in range(1, opt.epochs + 1):
-        adjust_learning_rate(opt, optimizer, epoch)
+    for epoch in range(1, args.epochs + 1):
+        adjust_learning_rate(args, optimizer, epoch)
 
         # train for one epoch
         time1 = time.time()
         if args.loss == 'SupCon': 
-            loss, train_acc = train_contrastive(train_loader, model, criterion, optimizer, epoch, opt, ALPHA=args.alpha, BETA=args.beta)
+            loss, train_acc = train_contrastive(train_loader, model, criterion, optimizer, epoch, args, ALPHA=args.alpha, BETA=args.beta)
 
         else:
-            loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, opt)
+            loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, args)
             
         time2 = time.time()
         print('epoch {}, total time {:.2f}'.format(epoch, time2 - time1))
@@ -212,9 +228,9 @@ def main():
 
         # evaluation
         if args.loss == 'SupCon': 
-            loss, train_acc = validate_contrastive(test_loader, model, criterion, opt, ALPHA=args.alpha, BETA=args.beta)
+            loss, val_acc = validate_contrastive(test_loader, model, criterion, args, epoch, ALPHA=args.alpha, BETA=args.beta)
         else:
-            loss, train_acc = validate(test_loader, model, criterion, optimizer, epoch, opt)
+            loss, val_acc = validate(test_loader, model, criterion, optimizer, epoch, args)
             
         logger.log_value('val_loss', loss, epoch)
         logger.log_value('val_acc', val_acc, epoch)
@@ -223,15 +239,15 @@ def main():
             best_acc = val_acc
 
         # TODO: on the highest accuracy, save the file
-        if epoch % opt.save_freq == 0:
+        if epoch % args.save_freq == 0:
             save_file = os.path.join(
-                opt.save_folder, 'ckpt_epoch_{epoch}.pth'.format(epoch=epoch))
-            save_model(model, optimizer, opt, epoch, save_file)
+                args.save_folder, 'ckpt_epoch_{epoch}.pth'.format(epoch=epoch))
+            save_model(model, optimizer, args, epoch, save_file)
 
     # save the last model
     save_file = os.path.join(
-        opt.save_folder, 'last.pth')
-    save_model(model, optimizer, opt, opt.epochs, save_file)
+        args.save_folder, 'last.pth')
+    save_model(model, optimizer, args, args.epochs, save_file)
 
     print('best accuracy: {:.2f}'.format(best_acc))
 
