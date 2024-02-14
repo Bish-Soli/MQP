@@ -4,6 +4,8 @@ import torch.optim as optim
 import numpy as np
 import math
 
+from torchvision.transforms import ToTensor
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -17,6 +19,8 @@ class MixupLTDataloader():
         self.labels = np.array(dataset.targets)
         self.dataset = dataset
 
+    def __len__(self):
+        return self.n_samples
     def __iter__(self):
         self.iteration_index = 0
         return self
@@ -36,8 +40,8 @@ class MixupLTDataloader():
         indices = np.where(self.labels == random_class)[0] # this is a numpy array
         rand_idx = np.random.randint(len(indices)+1)
         rand_sample, rand_label = self.dataset.__getitem__(rand_idx)
-        print(type(rand_sample))
-        return rand_sample , rand_label
+        # print(type(rand_sample))
+        return rand_sample, rand_label
 
     def generate_sample(self):
         rand_class = self.random_class()
@@ -45,21 +49,26 @@ class MixupLTDataloader():
 
     def generate_mixup(self):
         # Define two samplers
+        transform_to_tensor = ToTensor()  # Instantiate the transform
         probability = torch.zeros(self.n_classes)
 
         x1, y1 = self.generate_sample()
         x2, y2 = self.generate_sample()
+
+        # Convert PIL Images to tensors
+        x1 = transform_to_tensor(x1)
+        x2 = transform_to_tensor(x2)
 
         x_hat = self.alpha * x1 + (1 - self.alpha) * x2
         y_hat = self.alpha * y1 + (1 - self.alpha) * y2
 
         c1 = math.floor(y_hat)
         decimal = y_hat - c1
-        if c1 != self.n_classes -1:
+        if c1 != self.n_classes - 1:
             c2 = c1 + 1
         probability[c1] = 1 - decimal
         probability[c2] = decimal
-        return x_hat , torch.FloatTensor(probability)
+        return x_hat, torch.FloatTensor(probability)
 
     def generate_batch(self):
         data = []
@@ -98,22 +107,44 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
+# TODO top1, top5 accuracy
 
-def accuracy(output, target, topk=(1,)):
-    """Computes the accuracy over the k top predictions for the specified values of k"""
+# def accuracy(output, target, topk=(1, 5)):
+#     with torch.no_grad():
+#         maxk = max(topk)
+#         batch_size = target.size(0)
+#
+#         _, pred = output.topk(maxk, 1, True, True)
+#         pred = pred.t()
+#
+#         # Reshape and expand target to match pred shape
+#         correct = pred.eq(target.view(1, -1).expand(batch_size, maxk))
+#
+#         res = []
+#         for k in topk:
+#             correct_k = correct[:k].view(-1).float().sum(0)
+#             res.append(correct_k.mul_(100.0 / batch_size))
+#
+#         return res
+
+import torch
+
+def accuracy(output, target):
     with torch.no_grad():
-        maxk = max(topk)
-        batch_size = target.size(0)
+        # Convert one-hot encoded vectors to class indices
+        output_classes = torch.argmax(output, dim=1)
+        target_classes = torch.argmax(target, dim=1)
 
-        _, pred = output.topk(maxk, 1, True, True)
-        pred = pred.t()
-        correct = pred.eq(target.view(1, -1).expand_as(pred))
+        # Calculate the number of instances where predictions match the target
+        correct = torch.sum(output_classes == target_classes)
 
-        res = []
-        for k in topk:
-            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
-            res.append(correct_k.mul_(100.0 / batch_size))
-        return res
+        # Calculate the accuracy
+        acc = correct.float() / target.size(0)
+
+        return acc.item() * 100  # Convert to percentage
+
+
+
 
 
 def adjust_learning_rate(args, optimizer, epoch):
@@ -161,6 +192,7 @@ def save_model(model, optimizer, opt, epoch, save_file):
     del state
 
     
+
 def calculate_mean_std(ds_train):
     # TODO: Define function to calculate the mean and standard deviation across the training dataset
     """
@@ -201,4 +233,3 @@ def calculate_mean_std(ds_train):
     #return tuple(mean_rgb), tuple(std_rgb)
     
     return mean_rgb, std_rgb
-    

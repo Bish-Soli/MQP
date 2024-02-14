@@ -9,7 +9,7 @@ import os
 import numpy as np
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print(device)
+# print(device)
 
 class ImbalanceCIFAR(Dataset):
     def __init__(self, cifar_version=10, root='./data', train=True, transform=None, imbalance_ratio=0.01, dataset_Path = None , debug = False):
@@ -59,10 +59,14 @@ class ImbalanceCIFAR(Dataset):
             self.targets.extend([i] * len(selected_indices))
         np.random.shuffle(self.indices)
         if self.debug == True:
-          new_len = int(0.3 * len(self.targets))
+          new_len = 256
           self.targets = self.targets[:new_len]
           self.indices = self.indices[:new_len]
 
+    def debug_mode(self):
+        new_len = 256
+        self.targets = self.targets[:new_len]
+        self.indices = self.indices[:new_len]
     def __len__(self):
         return len(self.indices)
 
@@ -77,7 +81,7 @@ class ImbalanceCIFAR(Dataset):
     def get_class_names(self):
         return self.original_dataset.classes
 
-    def plot_class_distribution(self, dataset="bird", path=f'./results/{dataset}_class_distribution.png'):
+    def plot_class_distribution(self, dataset="bird", path=f'./class_distribution.png'):
         distribution = self.get_class_distribution()
         # Sort classes by the number of samples per class
         sorted_classes = sorted(distribution.items(), key=lambda item: item[1], reverse=True)

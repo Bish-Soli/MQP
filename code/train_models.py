@@ -145,16 +145,15 @@ def train(train_loader, model, criterion, optimizer, epoch, opt):
         # warm-up learning rate
         warmup_learning_rate(opt, epoch, idx, len(train_loader), optimizer)
 
-        # compute loss
+        # compute loss-
         output = model(images)
-        print(output.shape)
-        print(labels.shape)
+
         loss = criterion(output, labels.squeeze())
 
         # update metric
         losses.update(loss.item(), bsz)
-        acc1, acc5 = accuracy(output, labels, topk=(1, 5))
-        top1.update(acc1[0], bsz)
+        acc1 = accuracy(output, labels)
+        top1.update(acc1, bsz)
 
         # SGD
         optimizer.zero_grad()
@@ -200,8 +199,8 @@ def validate(val_loader, model, criterion, opt):
 
             # update metric
             losses.update(loss.item(), bsz)
-            acc1, acc5 = accuracy(output, labels, topk=(1, 5))
-            top1.update(acc1[0], bsz)
+            acc1 = accuracy(output, labels)
+            top1.update(acc1, bsz)
 
             # measure elapsed time
             batch_time.update(time.time() - end)
