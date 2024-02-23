@@ -132,6 +132,7 @@ def focal_weights(train_ds):
     # Get the class distribution from training dataset.
     class_distribution = train_ds.get_class_distribution()  
     class_counts = list(class_distribution.values())
+    # print('Class counts', class_counts)
     # Calculating the inverse frequency
     inverse_freq = [1.0 / count for count in class_counts]
     sum_inv_freq = sum(inverse_freq)

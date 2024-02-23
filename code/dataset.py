@@ -17,8 +17,10 @@ class ImbalanceCIFAR(Dataset):
       self.debug = debug
       self.transform = transform
 
+      # print('Creating the dataset.  The dataset path is', dataset_Path)
       if dataset_Path is None:
         if cifar_version == 10:
+            print('Cifar version is 10')
             self.original_dataset = torchvision.datasets.CIFAR10(root=root, train=train, download=True, transform=transform)
         elif cifar_version == 100:
             self.original_dataset = torchvision.datasets.CIFAR100(root=root, train=train, download=True, transform=transform)
@@ -28,7 +30,9 @@ class ImbalanceCIFAR(Dataset):
         self.num_classes = 10 if cifar_version == 10 else 100
         self._create_long_tailed(imbalance_ratio)
       else:
+        print('The dataset path is not none')
         directory = dataset_Path    # Set the directory you want to count
+        print('Directory within dataset.py', directory)
         entries = os.listdir(directory)   # List all the entries in the directory
         # Count the number of directories
         folder_count = sum(os.path.isdir(os.path.join(directory, entry)) for entry in entries)
@@ -58,7 +62,7 @@ class ImbalanceCIFAR(Dataset):
             self.indices.extend(selected_indices)
             self.targets.extend([i] * len(selected_indices))
         np.random.shuffle(self.indices)
-        if self.debug == True:
+        if self.debug:
           new_len = 256
           self.targets = self.targets[:new_len]
           self.indices = self.indices[:new_len]
@@ -164,40 +168,74 @@ class ImbalanceCIFAR(Dataset):
         indices = np.random.choice(self.indices, batch_size, replace=False)
         return [self.original_dataset[idx] for idx in indices]
 
+    @staticmethod
     def extract_features_and_labels(dataset):
         features = []
         labels = []
 
+        # Assuming the dataset yields (image, label) tuples where image is a PyTorch tensor
         for img, label in dataset:
-        # Flatten the image and convert to numpy array
-          flattened_img = torch.flatten(img).numpy()
-          features.append(flattened_img)
-          labels.append(label)
+            # Flatten the image and convert to a NumPy array or a single vector tensor
+            flattened_img = img.view(-1).numpy()  # If the image is a PyTorch tensor
+            features.append(flattened_img)
+            labels.append(label)
 
+        # Convert lists to NumPy arrays
         return np.array(features), np.array(labels)
 
-    def visualize_with_tsne(features, labels, class_names):
+    def visualize_with_tsne(self, features, labels):
+        # Select a subset of data for visualization to avoid overplotting
+        # For instance, randomly select 1000 samples if the dataset is large
+        if len(labels) > 1000:
+            indices = np.random.choice(range(len(labels)), 1000, replace=False)
+            features_subset = features[indices]
+            labels_subset = labels[indices]
+        else:
+            features_subset = features
+            labels_subset = labels
+
         tsne = TSNE(n_components=2, random_state=123)
-        tsne_results = tsne.fit_transform(features)
+        tsne_results = tsne.fit_transform(features_subset)
+
+        # Set up markers and colors
+        markers = ['o', 'v', '^', '<', '>', 's', 'p', '*', 'h', 'H']
+        colors = plt.cm.rainbow(np.linspace(0, 1, self.num_classes))
 
         plt.figure(figsize=(10, 8))
-        for i, class_name in enumerate(class_names):
-            indices = labels == i
-            plt.scatter(tsne_results[indices, 0], tsne_results[indices, 1], label=class_name)
+        for i in range(self.num_classes):
+            indices = labels_subset == i
+            plt.scatter(tsne_results[indices, 0], tsne_results[indices, 1],
+                        alpha=0.6, marker=markers[i % len(markers)],
+                        c=[colors[i]], label=self.original_dataset.classes[i])
         plt.legend()
         plt.title('t-SNE visualization of the dataset')
         plt.xlabel('t-SNE feature 1')
         plt.ylabel('t-SNE feature 2')
         plt.show()
 
-    def visualize_with_pca(features, labels, class_names):
+    def visualize_with_pca(self, features, labels):
+        # Select a subset of data for visualization to avoid overplotting
+        if len(labels) > 1000:
+            indices = np.random.choice(range(len(labels)), 1000, replace=False)
+            features_subset = features[indices]
+            labels_subset = labels[indices]
+        else:
+            features_subset = features
+            labels_subset = labels
+
         pca = PCA(n_components=2)
-        pca_results = pca.fit_transform(features)
+        pca_results = pca.fit_transform(features_subset)
+
+        # Set up markers and colors
+        markers = ['o', 'v', '^', '<', '>', 's', 'p', '*', 'h', 'H']
+        colors = plt.cm.rainbow(np.linspace(0, 1, self.num_classes))
 
         plt.figure(figsize=(10, 8))
-        for i, class_name in enumerate(class_names):
-          indices = labels == i
-          plt.scatter(pca_results[indices, 0], pca_results[indices, 1], label=class_name)
+        for i in range(self.num_classes):
+            indices = labels_subset == i
+            plt.scatter(pca_results[indices, 0], pca_results[indices, 1],
+                        alpha=0.6, marker=markers[i % len(markers)],
+                        c=[colors[i]], label=self.original_dataset.classes[i])
         plt.legend()
         plt.title('PCA visualization of the dataset')
         plt.xlabel('PCA feature 1')
@@ -205,10 +243,10 @@ class ImbalanceCIFAR(Dataset):
         plt.show()
 
 class ImbalanceCIFAR10(ImbalanceCIFAR):
-    def __init__(self, root='./data', train=True, transform=None, imbalance_ratio=0.1):
-        super(ImbalanceCIFAR10, self).__init__(cifar_version=10, root=root, train=train, transform=transform, imbalance_ratio=imbalance_ratio)
+    def __init__(self, root='./data', train=True, transform=None, imbalance_ratio=0.1, debug=0):
+        super(ImbalanceCIFAR10, self).__init__(cifar_version=10, root=root, train=train, transform=transform, imbalance_ratio=imbalance_ratio, debug=debug)
 
 
 class ImbalanceCIFAR100(ImbalanceCIFAR):
-    def __init__(self, root='./data', train=True, transform=None, imbalance_ratio=0.1):
-        super(ImbalanceCIFAR100, self).__init__(cifar_version=100, root=root, train=train, transform=transform, imbalance_ratio=imbalance_ratio)
+    def __init__(self, root='./data', train=True, transform=None, imbalance_ratio=0.1, debug=0):
+        super(ImbalanceCIFAR100, self).__init__(cifar_version=100, root=root, train=train, transform=transform, imbalance_ratio=imbalance_ratio, debug=debug)

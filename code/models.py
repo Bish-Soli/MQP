@@ -1,7 +1,7 @@
 import torch
 import torchvision
 from torchvision import transforms, datasets
-from torch.utils.data import DataLoader, Dataset,random_split
+from torch.utils.data import DataLoader, Dataset, random_split
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import random_split
@@ -20,7 +20,6 @@ from torch.utils.data.sampler import Sampler
 import numpy as np
 from torch.utils.data import Subset
 import math
-
 
 """ResNet in PyTorch.
 ImageNet-Style ResNet
@@ -171,6 +170,7 @@ model_dict = {
 
 class LinearBatchNorm(nn.Module):
     """Implements BatchNorm1d by BatchNorm2d, for SyncBN purpose"""
+
     def __init__(self, dim, affine=True):
         super(LinearBatchNorm, self).__init__()
         self.dim = dim
@@ -185,7 +185,8 @@ class LinearBatchNorm(nn.Module):
 
 class SupConResNet(nn.Module):
     """backbone + projection head"""
-    def __init__(self, name='resnet50', head='mlp', feat_dim=128, num_classes = 10):
+
+    def __init__(self, name='resnet50', head='mlp', feat_dim=128, num_classes=10):
         super(SupConResNet, self).__init__()
         model_fun, dim_in = model_dict[name]
         self.encoder = model_fun()
@@ -207,15 +208,16 @@ class SupConResNet(nn.Module):
 
         feat = self.encoder(x)
         feat = F.normalize(self.head(feat), dim=1)
-        bsz = int(feat.shape[0]/2)
+        bsz = int(feat.shape[0] / 2)
         f1, f2 = torch.split(feat, [bsz, bsz], dim=0)
         x = self.fc(f1)
         return feat, x
 
 
-#Cross entropy model
+# Cross entropy model
 class SupCEResNet(nn.Module):
     """encoder + classifier"""
+
     def __init__(self, name='resnet50', num_classes=10):
         super(SupCEResNet, self).__init__()
         model_fun, dim_in = model_dict[name]
@@ -228,6 +230,7 @@ class SupCEResNet(nn.Module):
 
 class LinearClassifier(nn.Module):
     """Linear classifier"""
+
     def __init__(self, name='resnet50', num_classes=10):
         super(LinearClassifier, self).__init__()
         _, feat_dim = model_dict[name]
