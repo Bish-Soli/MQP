@@ -1,58 +1,58 @@
+import os
+
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torchvision
-from torch.utils.data import Dataset
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
-import os
-import numpy as np
+from sklearn.manifold import TSNE
+from torch.utils.data import Dataset
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# print(device)
+
 
 class ImbalanceCIFAR(Dataset):
-    def __init__(self, cifar_version=10, root='./data', train=True, transform=None, imbalance_ratio=0.01, dataset_Path = None , debug = False):
-      super(ImbalanceCIFAR, self).__init__()
-      self.debug = debug
-      self.transform = transform
+    def __init__(self, cifar_version=10, root='./data', train=True, transform=None, imbalance_ratio=0.01,
+                 dataset_Path=None, debug=False):
+        super(ImbalanceCIFAR, self).__init__()
+        self.debug = debug
+        self.transform = transform
 
-      # print('Creating the dataset.  The dataset path is', dataset_Path)
-      if dataset_Path is None:
-        if cifar_version == 10:
-            print('Cifar version is 10')
-            self.original_dataset = torchvision.datasets.CIFAR10(root=root, train=train, download=True, transform=transform)
-        elif cifar_version == 100:
-            self.original_dataset = torchvision.datasets.CIFAR100(root=root, train=train, download=True, transform=transform)
+        # print('Creating the dataset.  The dataset path is', dataset_Path)
+        if dataset_Path is None:
+            if cifar_version == 10:
+                print('Cifar version is 10')
+                self.original_dataset = torchvision.datasets.CIFAR10(root=root, train=train, download=True,
+                                                                     transform=transform)
+            elif cifar_version == 100:
+                self.original_dataset = torchvision.datasets.CIFAR100(root=root, train=train, download=True,
+                                                                      transform=transform)
+            else:
+                raise ValueError("CIFAR version must be 10 or 100")
+
+            self.num_classes = 10 if cifar_version == 10 else 100
+            self._create_long_tailed(imbalance_ratio)
         else:
-            raise ValueError("CIFAR version must be 10 or 100")
-
-        self.num_classes = 10 if cifar_version == 10 else 100
-        self._create_long_tailed(imbalance_ratio)
-      else:
-        print('The dataset path is not none')
-        directory = dataset_Path    # Set the directory you want to count
-        print('Directory within dataset.py', directory)
-        entries = os.listdir(directory)   # List all the entries in the directory
-        # Count the number of directories
-        folder_count = sum(os.path.isdir(os.path.join(directory, entry)) for entry in entries)
-        self.num_classes = folder_count
-        shuffle = True #if train else False
-        self.original_dataset = torchvision.datasets.ImageFolder(dataset_Path, transform)
-        self._create_long_tailed(imbalance_ratio)
-
-
-
+            print('The dataset path is not none')
+            directory = dataset_Path  # Set the directory you want to count
+            print('Directory within dataset.py', directory)
+            entries = os.listdir(directory)  # List all the entries in the directory
+            # Count the number of directories
+            folder_count = sum(os.path.isdir(os.path.join(directory, entry)) for entry in entries)
+            self.num_classes = folder_count
+            shuffle = True  # if train else False
+            self.original_dataset = torchvision.datasets.ImageFolder(dataset_Path, transform)
+            self._create_long_tailed(imbalance_ratio)
 
     def _create_long_tailed(self, imbalance_ratio):
         # Get class distribution
         class_counts = np.bincount([label for _, label in self.original_dataset])
-        # Compute number of samples for least represented class
-        #num_samples_lt = [int(count * imbalance_ratio) for count in class_counts]
+
         # Compute number of samples for each class with exponential decrease
         max_count = max(class_counts)
 
-        num_samples_lt = [int(max_count * (imbalance_ratio ** (i / (self.num_classes - 1.0)))) for i in range(self.num_classes)]
+        num_samples_lt = [int(max_count * (imbalance_ratio ** (i / (self.num_classes - 1.0)))) for i in
+                          range(self.num_classes)]
         self.indices = []
         self.targets = []
         for i in range(self.num_classes):
@@ -63,14 +63,16 @@ class ImbalanceCIFAR(Dataset):
             self.targets.extend([i] * len(selected_indices))
         np.random.shuffle(self.indices)
         if self.debug:
-          new_len = 256
-          self.targets = self.targets[:new_len]
-          self.indices = self.indices[:new_len]
+            new_len = 256
+            self.targets = self.targets[:new_len]
+            self.indices = self.indices[:new_len]
+        print('The length of the dataset is', len(self.indices))
 
     def debug_mode(self):
         new_len = 256
         self.targets = self.targets[:new_len]
         self.indices = self.indices[:new_len]
+
     def __len__(self):
         return len(self.indices)
 
@@ -100,8 +102,10 @@ class ImbalanceCIFAR(Dataset):
         plt.plot(sorted_indices, sorted_counts, label='Class Distribution')
 
         # Fill the area under the curve
-        plt.fill_between(sorted_indices, sorted_counts, where=(np.array(sorted_counts) <= threshold), color='red', alpha=0.5, label='Minority classes')
-        plt.fill_between(sorted_indices, sorted_counts, where=(np.array(sorted_counts) > threshold), color='green', alpha=0.5, label='Majority classes')
+        plt.fill_between(sorted_indices, sorted_counts, where=(np.array(sorted_counts) <= threshold), color='red',
+                         alpha=0.5, label='Minority classes')
+        plt.fill_between(sorted_indices, sorted_counts, where=(np.array(sorted_counts) > threshold), color='green',
+                         alpha=0.5, label='Majority classes')
 
         # Add labels and title
         plt.xlabel('Sorted class indices (Large → Small)')
@@ -111,9 +115,10 @@ class ImbalanceCIFAR(Dataset):
 
         # Show the plot
         plt.savefig(path)
+        plt.close()
 
     def plot_class_distribution_imbalanced(self):
-      # Count the occurrences of each label
+        # Count the occurrences of each label
         labels = self.targets
         label_counts = {}
         for label in labels:
@@ -132,7 +137,6 @@ class ImbalanceCIFAR(Dataset):
         plt.ylabel("Frequency")
         plt.title("Label Distribution Histogram")
         plt.show()
-
 
     def get_samples_from_each_class(self, num_samples=1):
         samples = {}
@@ -157,7 +161,6 @@ class ImbalanceCIFAR(Dataset):
         grid_image = torchvision.utils.make_grid(images, nrow=num_samples)
         self.imshow(grid_image)
 
-
     def compute_imbalance_ratio(self):
         class_distribution = self.get_class_distribution()
         max_count = max(class_distribution.values())
@@ -168,8 +171,7 @@ class ImbalanceCIFAR(Dataset):
         indices = np.random.choice(self.indices, batch_size, replace=False)
         return [self.original_dataset[idx] for idx in indices]
 
-    @staticmethod
-    def extract_features_and_labels(dataset):
+    def extract_features_and_labels(self, dataset):
         features = []
         labels = []
 
@@ -207,11 +209,11 @@ class ImbalanceCIFAR(Dataset):
             plt.scatter(tsne_results[indices, 0], tsne_results[indices, 1],
                         alpha=0.6, marker=markers[i % len(markers)],
                         c=[colors[i]], label=self.original_dataset.classes[i])
-        plt.legend()
+
         plt.title('t-SNE visualization of the dataset')
         plt.xlabel('t-SNE feature 1')
         plt.ylabel('t-SNE feature 2')
-        plt.show()
+        plt.savefig('./tsne.png')
 
     def visualize_with_pca(self, features, labels):
         # Select a subset of data for visualization to avoid overplotting
@@ -240,13 +242,16 @@ class ImbalanceCIFAR(Dataset):
         plt.title('PCA visualization of the dataset')
         plt.xlabel('PCA feature 1')
         plt.ylabel('PCA feature 2')
-        plt.show()
+        plt.savefig('./pca.png')
+
 
 class ImbalanceCIFAR10(ImbalanceCIFAR):
     def __init__(self, root='./data', train=True, transform=None, imbalance_ratio=0.1, debug=0):
-        super(ImbalanceCIFAR10, self).__init__(cifar_version=10, root=root, train=train, transform=transform, imbalance_ratio=imbalance_ratio, debug=debug)
+        super(ImbalanceCIFAR10, self).__init__(cifar_version=10, root=root, train=train, transform=transform,
+                                               imbalance_ratio=imbalance_ratio, debug=debug)
 
 
 class ImbalanceCIFAR100(ImbalanceCIFAR):
     def __init__(self, root='./data', train=True, transform=None, imbalance_ratio=0.1, debug=0):
-        super(ImbalanceCIFAR100, self).__init__(cifar_version=100, root=root, train=train, transform=transform, imbalance_ratio=imbalance_ratio, debug=debug)
+        super(ImbalanceCIFAR100, self).__init__(cifar_version=100, root=root, train=train, transform=transform,
+                                                imbalance_ratio=imbalance_ratio, debug=debug)

@@ -1,25 +1,6 @@
 import torch
-import torchvision
-from torchvision import transforms, datasets
-from torch.utils.data import DataLoader, Dataset, random_split
-import numpy as np
-import matplotlib.pyplot as plt
-from torch.utils.data import random_split
 import torch.nn as nn
 import torch.nn.functional as F
-from sklearn.metrics import f1_score
-import torch.optim as optim
-from sklearn.metrics import confusion_matrix
-import seaborn as sns
-from sklearn.manifold import TSNE
-from sklearn.decomposition import PCA
-import os
-from PIL import Image
-import tarfile
-from torch.utils.data.sampler import Sampler
-import numpy as np
-from torch.utils.data import Subset
-import math
 
 """ResNet in PyTorch.
 ImageNet-Style ResNet

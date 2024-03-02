@@ -1,10 +1,12 @@
-import torch
-from torch import Tensor
-import torch.nn as nn
-import torch.nn.functional as F
 from typing import Optional, Sequence
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch import Tensor
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 
 class FocalLoss(nn.Module):
     """ Focal Loss, as described in https://arxiv.org/abs/1708.02002.
@@ -69,8 +71,6 @@ class FocalLoss(nn.Module):
             return torch.tensor(0.)
         x = x[unignored_mask]
 
-        # compute weighted cross entropy term: -alpha * log(pt)
-        # (alpha is already part of self.nll_loss)
         log_p = F.log_softmax(x, dim=-1)
         ce = self.nll_loss(log_p, y)
 
@@ -80,7 +80,7 @@ class FocalLoss(nn.Module):
 
         # compute focal term: (1 - pt)^gamma
         pt = log_pt.exp()
-        focal_term = (1 - pt)**self.gamma
+        focal_term = (1 - pt) ** self.gamma
 
         # the full loss: -alpha * ((1 - pt)^gamma) * log(pt)
         loss = focal_term * ce
@@ -91,6 +91,7 @@ class FocalLoss(nn.Module):
             loss = loss.sum()
 
         return loss
+
 
 def focal_loss(alpha: Optional[Sequence] = None,
                gamma: float = 0.,
@@ -128,9 +129,10 @@ def focal_loss(alpha: Optional[Sequence] = None,
         ignore_index=ignore_index)
     return fl
 
+
 def focal_weights(train_ds):
     # Get the class distribution from training dataset.
-    class_distribution = train_ds.get_class_distribution()  
+    class_distribution = train_ds.get_class_distribution()
     class_counts = list(class_distribution.values())
     # print('Class counts', class_counts)
     # Calculating the inverse frequency

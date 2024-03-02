@@ -1,9 +1,10 @@
+import sys
+import time
+
 import torch
 import torch.nn as nn
+
 from util import warmup_learning_rate, accuracy, AverageMeter
-import math
-import time
-import sys
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -24,10 +25,6 @@ def train_contrastive(train_loader, model, criterion, optimizer, epoch, opt, ALP
         data_time.update(time.time() - end)
 
         images = torch.cat([images[0], images[1]], dim=0)
-
-        # print(images.shape)
-        # print(images[0].shape)
-        # print(images[1].shape)
 
         if torch.cuda.is_available():
             images = images.cuda(non_blocking=True)
@@ -113,8 +110,6 @@ def validate_contrastive(test_loader, model, criterion, opt, epoch, ALPHA=0.8, B
                 raise ValueError('contrastive method not supported: {}'.
                                  format(opt.method))
 
-
-
             # update metric
             losses.update(loss.item(), bsz)
             acc1 = accuracy(x, labels)
@@ -123,7 +118,6 @@ def validate_contrastive(test_loader, model, criterion, opt, epoch, ALPHA=0.8, B
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
-
 
             # print info
             if (idx + 1) % opt.print_freq == 0:

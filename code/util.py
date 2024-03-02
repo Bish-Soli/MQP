@@ -1,18 +1,13 @@
-import torch
-import numpy as np
-import torch.optim as optim
-import numpy as np
-import math
-import matplotlib.pyplot as plt
-import os
 import json
-from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score, accuracy_score
+import math
+import os
+
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
+import torch
+import torch.optim as optim
 from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score, accuracy_score
-
-
-from torchvision.transforms import ToTensor
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -58,24 +53,13 @@ class MixupLTDataloader():
 
     def generate_mixup(self):
         # Define two samplers
-        # transform_to_tensor = ToTensor()  # Instantiate the transform
         probability = torch.zeros(self.n_classes)
 
         x1, y1 = self.generate_sample()
         x2, y2 = self.generate_sample()
 
-        # Convert PIL Images to tensors
-        # x1 = transform_to_tensor(x1)
-        # x2 = transform_to_tensor(x2)
-
         x_hat = self.alpha * x1 + (1 - self.alpha) * x2
         y_hat = self.alpha * y1 + (1 - self.alpha) * y2
-
-        # c1 = math.floor(y_hat)
-        # decimal = y_hat - c1
-        # if c1 != self.n_classes - 1:
-        #     c2 = c1 + 1
-        #     probability[c2] = decimal
 
         probability[y1] = self.alpha
         probability[y2] = (1 - self.alpha)
@@ -121,26 +105,6 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
-
-# TODO top1, top5 accuracy
-
-# def accuracy(output, target, topk=(1, 5)):
-#     with torch.no_grad():
-#         maxk = max(topk)
-#         batch_size = target.size(0)
-#
-#         _, pred = output.topk(maxk, 1, True, True)
-#         pred = pred.t()
-#
-#         # Reshape and expand target to match pred shape
-#         correct = pred.eq(target.view(1, -1).expand(batch_size, maxk))
-#
-#         res = []
-#         for k in topk:
-#             correct_k = correct[:k].view(-1).float().sum(0)
-#             res.append(correct_k.mul_(100.0 / batch_size))
-#
-#         return res
 
 import torch
 
@@ -190,22 +154,11 @@ def set_optimizer(opt, model):
                           weight_decay=opt.weight_decay)
     return optimizer
 
-    # def save_model(model, optimizer, opt, epoch, save_file):
-    #     print('==> Saving...')
-    #     state = {
-    #         'opt': opt,
-    #         'model': model.state_dict(),
-    #         'optimizer': optimizer.state_dict(),
-    #         'epoch': epoch,
-    #     }
-    #     torch.save(state, save_file)
-    #     del state
 
-
-def save_model(model, optimizer, args, epoch, val_acc, save_file):
+def save_model(model, optimizer, args, epoch, save_file, val_acc=None):
     # Ensure the save directory exists
     model_dir = os.path.join(args.save_folder, f"{args.dataset}",
-                             f"{args.method}_{args.model}_{args.dataset}_{val_acc:.2f}")
+                             f"{args.method}_{args.model}_{args.dataset}")
     os.makedirs(model_dir, exist_ok=True)
 
     # Save model state
@@ -213,7 +166,7 @@ def save_model(model, optimizer, args, epoch, val_acc, save_file):
         'epoch': epoch,
         'state_dict': model.state_dict(),
         'optimizer': optimizer.state_dict(),
-    }, os.path.join(model_dir, 'model_state.pth'))
+    }, save_file)
 
     # Save config
     config = {
@@ -225,6 +178,9 @@ def save_model(model, optimizer, args, epoch, val_acc, save_file):
         'dataset': args.dataset,
         'alpha': args.alpha,
         'beta': args.beta,
+        'Wight_decay': args.weight_decay,
+        'momentum': args.momentum,
+        'image_size': args.image_size
     }
     with open(os.path.join(model_dir, 'config.txt'), 'w') as f:
         json.dump(config, f, indent=4)
@@ -254,26 +210,11 @@ def calculate_mean_std(ds_train):
     mean_rgb = sum_rgb / total_pixels
     std_rgb = np.sqrt((sum_squared_rgb / total_pixels) - (mean_rgb ** 2))
 
-    # sum_rgb = np.array([0.0, 0.0, 0.0])
-    # sum_squared_rgb = np.array([0.0, 0.0, 0.0])
-    # total_pixels = 0
-
-    # for data, _ in ds_train:
-    # numpy_data = np.array(data) / 255.0  # Assumes data is a PIL Image
-    # sum_rgb += numpy_data.sum(axis=(0, 1))
-    # sum_squared_rgb += (numpy_data ** 2).sum(axis=(0, 1))
-    # total_pixels += numpy_data.shape[0] * numpy_data.shape[1]
-
-    # mean_rgb = sum_rgb / total_pixels
-    # std_rgb = np.sqrt((sum_squared_rgb / total_pixels) - (mean_rgb ** 2))
-
-    # Ensure the return format is explicitly a tuple of tuples
-    # return tuple(mean_rgb), tuple(std_rgb)
-
     return mean_rgb, std_rgb
 
 
-def plot_loss_curves(train_losses, val_losses,model_dir, title='Training and Validation Loss', xlabel='Epochs', ylabel='Loss',
+def plot_loss_curves(train_losses, val_losses, model_dir, title='Training and Validation Loss', xlabel='Epochs',
+                     ylabel='Loss',
                      save_path='loss_curves.png'):
     """Plots the training and validation loss curves.
 
@@ -300,7 +241,8 @@ def plot_loss_curves(train_losses, val_losses,model_dir, title='Training and Val
     plt.close()  # Close the plot to free memory
 
 
-def plot_accuracy_curves(train_accuracies, model_dir, val_accuracies, title='Training and Validation Accuracy', xlabel='Epochs',
+def plot_accuracy_curves(train_accuracies, model_dir, val_accuracies, title='Training and Validation Accuracy',
+                         xlabel='Epochs',
                          ylabel='Accuracy', save_path='accuracy_curves.png'):
     epochs = range(1, len(train_accuracies) + 1)
     plt.figure(figsize=(10, 6))
@@ -310,112 +252,97 @@ def plot_accuracy_curves(train_accuracies, model_dir, val_accuracies, title='Tra
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.legend()
-    plt.savefig(model_dir+'/accuracy_curve.png')
+    plt.savefig(model_dir + '/accuracy_curve.png')
     plt.close()  # Close the plot to free memory
 
 
+def evaluate_model_performance(model, data_loader, args, device, model_dir, save_path='confusion_matrix.png'):
+    """
+    Evaluate the model performance on a given dataset.
 
+    Parameters:
+    - model: The PyTorch model to evaluate.
+    - data_loader: DataLoader for the dataset to evaluate the model on.
+    - device: The device to run the model on ('cuda' or 'cpu').
 
-# def evaluate_model_performance(model, data_loader, device, model_dir, save_path='confusion_matrix.png'):
-#     """
-#     Evaluate the model performance on a given dataset.
-#
-#     Parameters:
-#     - model: The PyTorch model to evaluate.
-#     - data_loader: DataLoader for the dataset to evaluate the model on.
-#     - device: The device to run the model on ('cuda' or 'cpu').
-#
-#     This function plots the confusion matrix and prints precision, recall, F1 score, and accuracy.
-#     """
-#
-#     model.eval()  # Set the model to evaluation mode
-#     true_labels = []
-#     predictions = []
-#
-#     with torch.no_grad():  # Inference mode
-#         for inputs, labels in data_loader:
-#             inputs, labels = inputs.to(device), labels.to(device)
-#             outputs = model(inputs)
-#             _, preds = torch.max(outputs, 1)
-#             true_labels.extend(labels.cpu().numpy())
-#             predictions.extend(preds.cpu().numpy())
-#
-#     # Calculate metrics
-#     conf_mat = confusion_matrix(true_labels, predictions)
-#     precision = precision_score(true_labels, predictions, average='macro')
-#     recall = recall_score(true_labels, predictions, average='macro')
-#     f1 = f1_score(true_labels, predictions, average='macro')
-#     accuracy = accuracy_score(true_labels, predictions)
-#
-#     # Plotting the confusion matrix
-#     fig, ax = plt.subplots(figsize=(10, 10))
-#     sns.heatmap(conf_mat, annot=True, fmt='d', ax=ax, cmap="Blues", cbar=False)
-#     plt.ylabel('Actual')
-#     plt.xlabel('Predicted')
-#     plt.title('Confusion Matrix')
-#     plt.savefig(model_dir+'/confusion_matrix.png')
-#     plt.close()  # Close the plot to free memory
-#
-#     print("Precision: {:.4f}".format(precision))
-#     print("Recall: {:.4f}".format(recall))
-#     print("F1 Score: {:.4f}".format(f1))
-#     print("Accuracy: {:.4f}".format(accuracy))
-#
-#
-#     # Save config
-#     config = {
-#         'Precision': precision,
-#         'Recall': recall,
-#         'F1 Score': f1,
-#         'Accuracy': accuracy
-#     }
-#     with open(os.path.join(model_dir, 'results.txt'), 'w') as f:
-#         json.dump(config, f, indent=4)
+    This function plots the confusion matrix and prints precision, recall, F1 score, and accuracy.
+    """
 
-def evaluate_model_performance(model, data_loader, device, model_dir, save_path='confusion_matrix.png'):
     model.eval()  # Set the model to evaluation mode
     true_labels = []
     predictions = []
 
-    with torch.no_grad():  # Inference mode
-        for inputs, labels in data_loader:
-            # Directly send inputs and labels to the device, assuming they are already tensors
-            # if labels are not a list, just make a Tensor from the list
-            print(labels.shape)
-            print(inputs.shape)
-            inputs, labels = inputs.to(device), labels.to(device)
-            outputs = model(inputs)
-            _, preds = torch.max(outputs, 1)
-            true_labels.extend(labels.cpu().numpy())
-            predictions.extend(preds.cpu().numpy())
+    if args.method == 'SupCon':
+        with torch.no_grad():  # Inference mode
+            for inputs, labels in data_loader:
 
+                inputs = torch.cat([inputs[0], inputs[1]], dim=0)
+
+                if torch.cuda.is_available():
+                    inputs = inputs.cuda(non_blocking=True)
+                    labels = labels.cuda(non_blocking=True)
+
+                features, x = model(inputs)
+                _, preds = torch.max(x, 1)
+
+                true_labels.extend(labels.cpu().numpy())
+                predictions.extend(preds.cpu().numpy())
+    else:
+        with torch.no_grad():  # Inference mode
+            for inputs, labels in data_loader:
+                inputs, labels = inputs.to(device), labels.to(device)
+                outputs = model(inputs)
+                _, preds = torch.max(outputs, 1)
+                true_labels.extend(labels.cpu().numpy())
+                predictions.extend(preds.cpu().numpy())
+
+    class_labels = data_loader.dataset.original_dataset.classes
     # Calculate metrics
+
     conf_mat = confusion_matrix(true_labels, predictions)
     precision = precision_score(true_labels, predictions, average='macro')
     recall = recall_score(true_labels, predictions, average='macro')
     f1 = f1_score(true_labels, predictions, average='macro')
-    accuracy = accuracy_score(true_labels, predictions)
+    acc = accuracy_score(true_labels, predictions)
 
-    # Plotting the confusion matrix
-    fig, ax = plt.subplots(figsize=(10, 10))
-    sns.heatmap(conf_mat, annot=True, fmt='d', ax=ax, cmap="Blues", cbar=False)
-    plt.ylabel('Actual')
-    plt.xlabel('Predicted')
-    plt.title('Confusion Matrix')
-    plt.savefig(model_dir + '/' + save_path)
-    plt.close()  # Close the plot to free memory
+    if args.dataset == 'path':
+        fig, ax = plt.subplots(figsize=(70, 70))
+        sns.heatmap(conf_mat, annot=True, fmt='d', ax=ax, cmap="Blues", cbar=False,
+                    xticklabels=class_labels, yticklabels=class_labels)
+
+        # Rotate the x-axis labels
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
+        plt.ylabel('Actual')
+        plt.xlabel('Predicted')
+        plt.title('Confusion Matrix')
+        plt.savefig(model_dir + '/confusion_matrix.png')
+        plt.close()  # Close the plot to free memory
+    else:
+
+        # Plotting the confusion matrix
+        fig, ax = plt.subplots(figsize=(10, 10))
+        sns.heatmap(conf_mat, annot=True, fmt='d', ax=ax, cmap="Blues", cbar=False,
+                    xticklabels=class_labels, yticklabels=class_labels)
+
+        # Rotate the x-axis labels
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
+        plt.ylabel('Actual')
+        plt.xlabel('Predicted')
+        plt.title('Confusion Matrix')
+        plt.savefig(model_dir + '/confusion_matrix.png')
+        plt.close()  # Close the plot to free memory
 
     print("Precision: {:.4f}".format(precision))
     print("Recall: {:.4f}".format(recall))
     print("F1 Score: {:.4f}".format(f1))
-    print("Accuracy: {:.4f}".format(accuracy))
+    print("Accuracy: {:.4f}".format(acc))
 
-    # Save evaluation metrics
+    # Save config
     config = {
         'Precision': precision,
         'Recall': recall,
         'F1 Score': f1,
-        'Accuracy': accuracy
+        'Accuracy': acc
     }
     with open(os.path.join(model_dir, 'results.txt'), 'w') as f:
         json.dump(config, f, indent=4)

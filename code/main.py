@@ -1,25 +1,23 @@
+import argparse
+import math
+import os
+import time
+
 import torch
 import torch.backends.cudnn as cudnn
-from torchvision import transforms
 from torch.utils.data import DataLoader
-# from tensorboard_logger import tb_logger
-import os
-import math
-import argparse
-import time
-from train_models import validate, validate_contrastive, train, train_contrastive
-from models import SupCEResNet, SupConResNet
-from losses import SupConLoss
+
 from dataset import ImbalanceCIFAR, ImbalanceCIFAR10, ImbalanceCIFAR100
-from util import MixupLTDataloader, save_model, adjust_learning_rate, set_optimizer, plot_loss_curves, \
-    plot_accuracy_curves, TwoCropTransform, evaluate_model_performance, calculate_mean_std
 from focal import focal_loss, focal_weights
+from losses import SupConLoss
+from models import SupCEResNet, SupConResNet
+from train_models import validate, validate_contrastive, train, train_contrastive
+from util import save_model, adjust_learning_rate, set_optimizer, plot_loss_curves, \
+    plot_accuracy_curves, TwoCropTransform, evaluate_model_performance
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-# print('Device', device)
-# exit(1)
 def parse_option():
     parser = argparse.ArgumentParser('argument for training')
 
@@ -88,7 +86,7 @@ def parse_option():
                         help='id for recording multiple runs')
 
     opt = parser.parse_args()
-
+    # check 02/23/2024
     # check if dataset is path that passed required arguments
     if opt.dataset == 'path':
         # TODO: automatically pull the mean and std from a custom dataset
@@ -105,10 +103,9 @@ def parse_option():
     for it in iterations:
         opt.lr_decay_epochs.append(int(it))
 
-    opt.model_name = opt.dataset
-    # '{}_{}_{}_lr_{}_decay_{}_bsz_{}_temp_{}_trial_{}'. \
-    #   format(opt.method, opt.dataset, opt.model, opt.learning_rate,
-    #         opt.weight_decay, opt.batch_size, opt.temp, opt.trial)
+    opt.model_name = '{}_{}_{}_lr_{}_decay_{}_bsz_{}_trial_{}_alpa_{}'. \
+        format(opt.method, opt.dataset, opt.model, opt.learning_rate,
+               opt.weight_decay, opt.batch_size, opt.trial, opt.alpha)
 
     if opt.cosine:
         opt.model_name = '{}_cosine'.format(opt.model_name)
@@ -161,7 +158,20 @@ def main():
     best_acc = 0
     args = parse_option()
 
-    # Define the dataset 
+    from torchvision import transforms
+
+    train_transform = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        transforms.RandomRotation(10),  # rotates the image by up to 10 degrees
+        transforms.ToTensor(),
+        norm
+    ])
+
+    test_transform = transforms.Compose([
+        transforms.ToTensor(),
+        norm
+    ])
 
     test_transform = transforms.Compose([
 
@@ -180,10 +190,6 @@ def main():
     if args.load_dataset:
         ds_train = None
         ds_test = None
-        # # ds_train.debug_mode()
-        # # ds_test.debug_mode()
-        # print('Training length', len(ds_train))
-        # print('Testing length', len(ds_test))
 
         if args.dataset == 'cifar10':
             if args.method == 'SupCon':
@@ -207,14 +213,14 @@ def main():
             # TODO: Update based on what you end up calling the supcon files.
             ds_train = torch.load('./train.pt')
             ds_test = torch.load('./test.pt')
-            args.n_cls = 525
+            args.n_cls = 75
     else:
         if args.dataset == 'cifar10':
             if args.method == 'SupCon':
                 print('Dataset is cifar10')
                 ds_test = ImbalanceCIFAR10(train=False, transform=TwoCropTransform(test_transform), imbalance_ratio=1,
                                            debug=args.debug)
-                ds_train = ImbalanceCIFAR10(train=True, transform=TwoCropTransform(test_transform),
+                ds_train = ImbalanceCIFAR10(train=True, transform=TwoCropTransform(train_transform),
                                             imbalance_ratio=args.imbalance_ratio, debug=args.debug)
 
                 torch.save(ds_train, 'supcon_cifar10_train.pt')
@@ -222,9 +228,8 @@ def main():
             else:
 
                 print('Dataset is cifar10')
-                ds_train = ImbalanceCIFAR10(train=True, transform=test_transform, imbalance_ratio=args.imbalance_ratio,
+                ds_train = ImbalanceCIFAR10(train=True, transform=train_transform, imbalance_ratio=args.imbalance_ratio,
                                             debug=args.debug)
-                # print('Method is', args.method, 'and ds_train is', type(ds_train))
 
                 ds_test = ImbalanceCIFAR10(train=False, transform=test_transform,
                                            imbalance_ratio=1,
@@ -239,7 +244,7 @@ def main():
                 print('Dataset is cifar100')
                 ds_test = ImbalanceCIFAR100(train=False, transform=TwoCropTransform(test_transform), imbalance_ratio=1,
                                             debug=args.debug)
-                ds_train = ImbalanceCIFAR100(train=True, transform=TwoCropTransform(test_transform),
+                ds_train = ImbalanceCIFAR100(train=True, transform=TwoCropTransform(train_transform),
                                              imbalance_ratio=args.imbalance_ratio, debug=args.debug)
 
                 torch.save(ds_train, 'supcon_cifar100_train.pt')
@@ -247,7 +252,8 @@ def main():
             else:
 
                 print('Dataset is cifar100')
-                ds_train = ImbalanceCIFAR100(train=True, transform=test_transform, imbalance_ratio=args.imbalance_ratio,
+                ds_train = ImbalanceCIFAR100(train=True, transform=train_transform,
+                                             imbalance_ratio=args.imbalance_ratio,
                                              debug=args.debug)
                 ds_test = ImbalanceCIFAR100(train=False, transform=test_transform,
                                             imbalance_ratio=1,
@@ -261,43 +267,47 @@ def main():
                 transforms.ToTensor(),
                 norm
             ])
+
+            train_transform = transforms.Compose([
+                transforms.Resize(args.image_size),
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomVerticalFlip(),
+                transforms.RandomRotation(10),  # rotates the image by up to 10 degrees
+                transforms.ToTensor(),
+                norm
+            ])
+
             # custom dataset /bishoy/desktop/bird-dataset /train /test
             if args.method == 'SupCon':
-                print('Dataset is BirdsDataset')
+                print('Dataset is ButterflyDataset')
                 ds_test = ImbalanceCIFAR(train=False, transform=TwoCropTransform(test_transform), imbalance_ratio=1,
                                          dataset_Path=f"{args.data_folder}/test", debug=args.debug)
-                ds_train = ImbalanceCIFAR(train=True, transform=TwoCropTransform(test_transform),
+                ds_train = ImbalanceCIFAR(train=True, transform=TwoCropTransform(train_transform),
                                           imbalance_ratio=args.imbalance_ratio,
                                           dataset_Path=f"{args.data_folder}/train", debug=args.debug)
             else:
 
-                print('Dataset is BirdsDataset')
+                print('Dataset is ButterflyDataset')
 
-                #TODO change the valid to train and test
+                # TODO change the valid to train and test
                 print(args.data_folder)
-                train_dataset_Path = os.path.join(args.data_folder, "train") # \ /
+                train_dataset_Path = os.path.join(args.data_folder, "train")  # \ /
                 test_dataset_Path = os.path.join(args.data_folder, "test")  # \ /
 
-                ds_train = ImbalanceCIFAR(train=True, transform=test_transform, imbalance_ratio=args.imbalance_ratio,
+                print('Train dataset path', train_dataset_Path)
+                print('Test dataset path', test_dataset_Path)
+
+                ds_train = ImbalanceCIFAR(train=True, transform=train_transform, imbalance_ratio=args.imbalance_ratio,
                                           dataset_Path=train_dataset_Path, debug=args.debug)
                 ds_test = ImbalanceCIFAR(train=False, transform=test_transform,
                                          imbalance_ratio=1, dataset_Path=test_dataset_Path,
                                          debug=args.debug)  # imbalance_ratio=1 to keep original distribution
 
-            args.n_cls = 525
+            args.n_cls = 75
             print('Saving the imbalanced datasets!')
             torch.save(ds_train, 'train.pt')
             torch.save(ds_test, 'test.pt')
-    # exit(18)
 
-    # TODO mean, std = calculate_mean_std(ds_train)
-    # this is in util.py
-
-    # TODO
-    # Create testing DataLoaders
-    # test_loader_birdDataset = DataLoader(Imbalanced_Bird_Dataset_test, batch_size=64, shuffle=False)
-    # changed here
-    # fromargs.loss to args.method
     print('Defining the loss.')
     if args.method == 'CE':
         # Define the crossentropy loss
@@ -313,15 +323,7 @@ def main():
     else:
         raise ValueError('Loss not configured.')
 
-    # Define the dataloaders
-    print('Mixup', args.mixup)
-    # exit(1)
-    if args.mixup == 1:
-        # TODO: Import mixup from util.py
-        print('Using mixup!')
-        train_loader = MixupLTDataloader(dataset=ds_train, batch_size=args.batch_size)
-    else:
-        train_loader = DataLoader(ds_train, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+    train_loader = DataLoader(ds_train, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
 
     # Create validation DataLoaders
     test_loader = DataLoader(ds_test, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
@@ -332,21 +334,17 @@ def main():
     # build optimizer
     optimizer = set_optimizer(args, model)
 
-    # tensorboard
-    # logger = tb_logger.Logger(logdir=args.tb_folder, flush_secs=2)
     print('Starting training.')
-    # training routine
-    # Initialize early stopping criteria
 
     # changed heere for early stopping
     best_val_loss = math.inf  # Monitor the best validation accuracy
     patience = 10  # How many epochs to wait after last time validation accuracy improved.
     patience_counter = 0  # Counter for how many epochs have gone by without improvement
 
-    # changed here 02/15/2024
     # Initialize lists for plotting
     train_losses, val_losses = [], []
     train_accuracies, val_accuracies = [], []
+    model_dir = None
 
     for epoch in range(1, args.epochs + 1):
         adjust_learning_rate(args, optimizer, epoch)
@@ -360,7 +358,6 @@ def main():
             loss, train_acc = train(train_loader, model, criterion, optimizer, epoch, args)
         time2 = time.time()
 
-        # changed here 02/15/2024
         train_losses.append(loss)
         train_accuracies.append(train_acc)
         print('epoch {}, accuracy: {:.2f}, total time {:.2f}'.format(epoch, train_acc, time2 - time1))
@@ -372,6 +369,8 @@ def main():
             # changed here 02/15/2024
             val_losses.append(val_loss)
             val_accuracies.append(val_acc)
+            print('val_loss', val_loss, epoch)
+            print('val_acc', val_acc, epoch)
         else:
 
             val_loss, val_acc = validate(test_loader, model, criterion, args)
@@ -381,16 +380,13 @@ def main():
             print('val_loss', val_loss, epoch)
             print('val_acc', val_acc, epoch)
 
-        # changed here 02/21/2024
-
-
         # Check if current validation accuracy is the best we've seen so far
         if val_loss < best_val_loss:
             # Save the model if validation accuracy has improved
-            save_file = os.path.join(args.save_folder, 'best_model.pth')
-            save_model(model, optimizer, args, epoch, val_acc, save_file)
+            best_model_file = os.path.join(args.save_folder, 'best_model.pth')
+            model_dir = save_model(model, optimizer, args, epoch, best_model_file)
 
-            print(f"Validation Loss improved from {best_val_loss} to {val_loss}. Saving model to {save_file}")
+            print(f"Validation Loss improved from {best_val_loss} to {val_loss}. Saving model to {best_model_file}")
             best_val_loss = val_loss
             patience_counter = 0  # Reset patience counter
         else:
@@ -403,23 +399,22 @@ def main():
             print(f"Stopping early due to no improvement in validation Loss for {patience} epochs")
             break
 
-        # Optional: Save checkpoints every args.save_freq epochs
-        # if epoch % args.save_freq == 0:
-        #     checkpoint_file = os.path.join(args.save_folder, f'ckpt_epoch_{epoch}.pth')
-        #     save_model(model, optimizer, args, epoch, checkpoint_file)
+    """
+    Load the best model 
+    """
+    inf_model = set_model(args)
+    # Load the saved file
+    checkpoint = torch.load(best_model_file)
 
-    # changed here 02/15/2024
-    # After training completes, plot and save loss and accuracy curves
+    # Update model and optimizer states
+    inf_model.load_state_dict(checkpoint['state_dict'])
 
-
-    # save the last model
-    save_file = os.path.join(
-        args.save_folder, 'last.pth')
-    model_dir = save_model(model, optimizer, args, args.epochs, val_acc, save_file)
-    evaluate_model_performance(model, test_loader, device,model_dir, save_path = 'confusion_matrix.png')  # Add this line
-    plot_loss_curves(train_losses, val_losses,model_dir, title='Training and Validation Loss', xlabel='Epochs', ylabel='Loss',
+    evaluate_model_performance(inf_model, test_loader, args, device, model_dir,
+                               save_path='confusion_matrix.png')  # Add this line
+    plot_loss_curves(train_losses, val_losses, model_dir, title='Training and Validation Loss', xlabel='Epochs',
+                     ylabel='Loss',
                      save_path='loss_curves.png')
-    plot_accuracy_curves(train_accuracies,model_dir, val_accuracies, title='Training and Validation Accuracy',
+    plot_accuracy_curves(train_accuracies, model_dir, val_accuracies, title='Training and Validation Accuracy',
                          xlabel='Epochs', ylabel='Accuracy', save_path='accuracy_curves.png')
     print('best Loss: {:.2f}'.format(best_val_loss))
     print('model directory is' + model_dir)
