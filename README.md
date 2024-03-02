@@ -40,12 +40,15 @@ dataset = ImbalanceCIFAR10(root='data', imb_ratio=0.1, transform=transforms)
 The project includes implementations of ResNet architectures. The models.py script provides classes such as SupConResNet and SupCEResNet with support for contrastive learning and cross-entropy respectively.
 
 ### Usage
-```from models import SupConResNet, SupCEResNet
+```
+from models import SupConResNet, SupCEResNet
 
 # Example for SupConResNet
-model = SupConResNet(name='resnet50', head='mlp', feat_dim=128, num_classes=10)```
+model = SupConResNet(name='resnet50', head='mlp', feat_dim=128, num_classes=10)
+```
 
 ## How to Cite Please cite this work as:
+
 Bishoy Soliman Hanna, "Convergent Learning for Class Imbalance: A Unified Approach to Long-Tail Recognition in Image Classification," Worcester Polytechnic Institute, Feb 2024.
 
 
