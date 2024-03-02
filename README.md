@@ -9,8 +9,13 @@ Class imbalances within datasets can skew the performance of machine learning mo
 
 Before running the project, install the required packages:
 
-```bash
-pip install -r requirements.txt
+```
+torch
+torchvision
+matplotlib
+seaborn
+sklearn
+numpy
 ```
 
 ## Dataset
