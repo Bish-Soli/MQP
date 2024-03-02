@@ -17,6 +17,11 @@ seaborn
 sklearn
 numpy
 ```
+Install them using pip:
+
+```bash
+pip install torch torchvision matplotlib seaborn sklearn numpy```
+
 
 ## Dataset
 The dataset.py script is used to create imbalanced versions of CIFAR10, CIFAR100, and custom datasets. It supports various transformations and allows for a flexible approach to dataset preparation.
