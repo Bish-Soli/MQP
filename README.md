@@ -10,18 +10,7 @@ Class imbalances within datasets can skew the performance of machine learning mo
 Before running the project, install the required packages:
 
 ```
-torch
-torchvision
-matplotlib
-seaborn
-sklearn
-numpy
-```
-Install them using pip:
-
-```
-bash
-pip install torch torchvision matplotlib seaborn sklearn numpy
+pip install -r requirements.txt
 ```
 
 
