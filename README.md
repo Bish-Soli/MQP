@@ -26,7 +26,7 @@ The project includes implementations of ResNet architectures. The models.py scri
 
 ## Hardware
 
-We used Google Colab A100 GPU.
+We used Google Colab with A100 GPU.
 
 ## Code Execution
 
