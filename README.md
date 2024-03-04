@@ -55,7 +55,9 @@ For the Supervised Contrastive + Cross Entropy on the customer dataset, you can 
 Our experiment file on Google Colab for CIFAR10/100 is throw Colab_CIFAR10_&_CIFAR100.ipynb, also for the Custom Dataset is throw Colab_Custom_Dataset.ipynb 
 
 
-## How to Cite Please cite this work as:
+## How to Cite 
+
+Please cite this work as:
 
 Bishoy Soliman Hanna, "Convergent Learning for Class Imbalance: A Unified Approach to Long-Tail Recognition in Image Classification," Worcester Polytechnic Institute, Feb 2024.
 
