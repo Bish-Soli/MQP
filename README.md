@@ -13,28 +13,48 @@ Before running the project, install the required packages:
 pip install -r requirements.txt
 ```
 
-
 ## Dataset
 The dataset.py script is used to create imbalanced versions of CIFAR10, CIFAR100, and custom datasets. It supports various transformations and allows for a flexible approach to dataset preparation.
 
-### Usage
 
-```
-from dataset import ImbalanceCIFAR10, ImbalanceCIFAR100
+## Custom Dataset
 
-# Example for CIFAR10
-dataset = ImbalanceCIFAR10(root='data', imb_ratio=0.1, transform=transforms)
-```
+To run this code on a Custom Dataset, the directory structure needs to follow that of Pytorch ImageFolder.
+
 ## Models
 The project includes implementations of ResNet architectures. The models.py script provides classes such as SupConResNet and SupCEResNet with support for contrastive learning and cross-entropy respectively.
 
-### Usage
-```
-from models import SupConResNet, SupCEResNet
+## Hardware
 
-# Example for SupConResNet
-model = SupConResNet(name='resnet50', head='mlp', feat_dim=128, num_classes=10)
+We used Google Colab A100 GPU.
+
+## Code Execution
+
+In order to run the code on CIFAR10/100, please folow the below format:
+
 ```
+!python main.py --model resnet18 --dataset cifar10  --method CE --epoch 100 --learning_rate 0.1 --batch_size 32 --debug 0
+
+```
+For the Supervised Contrastive + Cross Entropy, you can use the below format:
+
+```
+!python main.py --model resnet18 --dataset cifar10  --method SupCon --epoch 100 --learning_rate 0.1 --batch_size 32 --debug 0 --alpha 0.5 --beta 0.5
+```
+
+For the Custom Dataset, please follow the below format:
+
+```
+!python main.py --model resnet34 --data_folder /content/dataset --dataset path  --method CE --epoch 100  --learning_rate 0.1 --batch_size 32  --image_size 64 
+```
+For the Supervised Contrastive + Cross Entropy on the customer dataset, you can use the below format:
+
+```
+!python main.py --model resnet18 --data_folder /content/dataset --dataset path  --method SupCon --epoch 100  --learning_rate 0.1 --batch_size 32  --image_size 64 --alpha 0.5 --beta 0.5
+```
+
+
+
 
 ## How to Cite Please cite this work as:
 
