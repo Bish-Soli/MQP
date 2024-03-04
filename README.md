@@ -52,8 +52,7 @@ For the Supervised Contrastive + Cross Entropy on the customer dataset, you can 
 ```
 !python main.py --model resnet18 --data_folder /content/dataset --dataset path  --method SupCon --epoch 100  --learning_rate 0.1 --batch_size 32  --image_size 64 --alpha 0.5 --beta 0.5
 ```
-
-
+Our experiment file on Google Colab for CIFAR10/100 is throw Colab_CIFAR10_&_CIFAR100.ipynb, also for the Custom Dataset is throw Colab_Custom_Dataset.ipynb 
 
 
 ## How to Cite Please cite this work as:
